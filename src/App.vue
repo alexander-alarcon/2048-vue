@@ -8,6 +8,6 @@ message.value = 'Hello Vue!'
 </script>
 
 <template>
-  <h1>2048 clone</h1>
-  <p>{{ message }}</p>
+  <h1 class="text-3xl text-stone-800 p-4">2048 clone</h1>
+  <p class="text-lg text-slate-500 px-4">{{ message }}</p>
 </template>
