@@ -52,51 +52,71 @@ function move(board, index, isRow = false, isBackward = false) {
  * @returns
  */
 function mergeRow(row, isBackward = false) {
-  const mergedRow = [...row];
+  const merged = [...row];
+  let points = 0;
 
   if (isBackward) {
-    for (let i = mergedRow.length; i > 0; i -= 1) {
-      if (mergedRow[i] === mergedRow[i - 1]) {
-        mergedRow[i] *= 2;
-        mergedRow[i - 1] = 0;
+    for (let i = merged.length; i > 0; i -= 1) {
+      if (merged[i] === merged[i - 1]) {
+        merged[i] *= 2;
+        merged[i - 1] = 0;
+        points += merged[i];
       }
     }
   } else {
-    for (let i = 0; i < mergedRow.length - 1; i += 1) {
-      if (mergedRow[i] === mergedRow[i + 1]) {
-        mergedRow[i] *= 2;
-        mergedRow[i + 1] = 0;
+    for (let i = 0; i < merged.length - 1; i += 1) {
+      if (merged[i] === merged[i + 1]) {
+        merged[i] *= 2;
+        merged[i + 1] = 0;
+        points += merged[i];
       }
     }
   }
 
-  return mergedRow;
+  return { merged, points };
+}
+
+function createBoard(boardSize) {
+  const board = Array.from({ length: boardSize }).map(() =>
+    Array.from({ length: boardSize }).fill(0)
+  );
+
+  return board;
+}
+
+const initialState = {
+  boardSize: 4,
+  history: [],
+  score: parseInt(localStorage.getItem("score") || 0, 10),
+  bestScore: parseInt(localStorage.getItem("bestScore") || 0, 10),
+};
+
+function initBoard(boardSize) {
+  const board = createBoard(boardSize);
+  const { x: x1, y: y1 } = getRandomEmptyCell(board, getRandomItem(DIRECTIONS));
+  board[y1][x1] = getRandomItem([2, 2, 2, 4]);
+
+  const { x: x2, y: y2 } = getRandomEmptyCell(board, getRandomItem(DIRECTIONS));
+  board[y2][x2] = getRandomItem([2, 2, 2, 4]);
+
+  return board;
 }
 
 const useMainStore = defineStore("main", {
   state() {
-    const boardSize = 4;
-
-    const board = Array.from({ length: boardSize }).map(() =>
-      Array.from({ length: boardSize }).fill(0)
-    );
-
-    const { x: x1, y: y1 } = getRandomEmptyCell(
-      board,
-      getRandomItem(DIRECTIONS)
-    );
-    board[y1][x1] = getRandomItem([2, 2, 2, 4]);
-
-    const { x: x2, y: y2 } = getRandomEmptyCell(
-      board,
-      getRandomItem(DIRECTIONS)
-    );
-    board[y2][x2] = getRandomItem([2, 2, 2, 4]);
+    let board = localStorage.getItem("board");
+    if (!board) {
+      board = initBoard(initialState.boardSize);
+    } else {
+      board = JSON.parse(board);
+    }
 
     return {
-      boardSize,
+      boardSize: initialState.boardSize,
       board,
-      history: [],
+      history: initialState.history,
+      score: initialState.score,
+      bestScore: initialState.bestScore,
     };
   },
   getters: {
@@ -110,7 +130,7 @@ const useMainStore = defineStore("main", {
       return state.board.some((column) => column.some((cell) => cell === 0));
     },
     canGoBack(state) {
-      return state.history.length > 0;
+      return state.history.length > 0 && !state.hasWin;
     },
   },
   actions: {
@@ -123,9 +143,13 @@ const useMainStore = defineStore("main", {
       for (let column = 0; column < this.boardSize; column += 1) {
         const nextCol = move(currentBoard, column);
         const mergedCol = mergeRow(nextCol);
-        mergedCol.forEach((current, i) => {
+        mergedCol.merged.forEach((current, i) => {
           currentBoard[i][column] = current;
         });
+        this.score += mergedCol.points;
+        if (this.score > this.bestScore) {
+          this.bestScore = this.score;
+        }
       }
 
       this.board = currentBoard;
@@ -146,9 +170,13 @@ const useMainStore = defineStore("main", {
         const nextCol = move(currentBoard, column, false, true);
         const mergedCol = mergeRow(nextCol, true);
 
-        mergedCol.forEach((current, i) => {
+        mergedCol.merged.forEach((current, i) => {
           currentBoard[i][column] = current;
         });
+        this.score += mergedCol.points;
+        if (this.score > this.bestScore) {
+          this.bestScore = this.score;
+        }
       }
 
       this.board = currentBoard;
@@ -168,9 +196,13 @@ const useMainStore = defineStore("main", {
       for (let row = 0; row < this.boardSize; row += 1) {
         const nextRow = move(currentBoard, row, true);
         const mergedRow = mergeRow(nextRow);
-        mergedRow.forEach((current, i) => {
+        mergedRow.merged.forEach((current, i) => {
           currentBoard[row][i] = current;
         });
+        this.score += mergedRow.points;
+        if (this.score > this.bestScore) {
+          this.bestScore = this.score;
+        }
       }
 
       this.board = currentBoard;
@@ -189,9 +221,13 @@ const useMainStore = defineStore("main", {
       for (let row = 0; row < this.boardSize; row += 1) {
         const nextRow = move(currentBoard, row, true, true);
         const mergedRow = mergeRow(nextRow, true);
-        mergedRow.forEach((current, i) => {
+        mergedRow.merged.forEach((current, i) => {
           currentBoard[row][i] = current;
         });
+        this.score += mergedRow.points;
+        if (this.score > this.bestScore) {
+          this.bestScore = this.score;
+        }
       }
 
       this.board = currentBoard;
@@ -204,6 +240,13 @@ const useMainStore = defineStore("main", {
     },
     goBack() {
       this.board = this.history.pop();
+    },
+    reset() {
+      localStorage.removeItem("board");
+      localStorage.removeItem("score");
+      this.history = initialState.history;
+      this.board = initBoard(initialState.boardSize);
+      this.score = 0;
     },
   },
 });
